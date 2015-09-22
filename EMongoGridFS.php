@@ -173,14 +173,22 @@ abstract class EMongoGridFS extends EMongoDocument
         }
 
         try {
-            $result = $this->getCollection()->put($filename, $rawData);
+            $result = $this->getCollection()->put(
+                $filename,
+                $rawData,
+                array('w' => $this->getSafeFlag(), 'j' => $this->getFsyncFlag())
+            );
         } catch (MongoException $ex) {
             Yii::log(
                 'Failed to send put(); retrying: ' . PHP_EOL . 'Error: '
                 . $ex->getMessage(),
                 CLogger::LEVEL_WARNING
             );
-            $result = $this->getCollection()->put($filename, $rawData);
+            $result = $this->getCollection()->put(
+                $filename,
+                $rawData,
+                array('w' => $this->getSafeFlag(), 'j' => $this->getFsyncFlag())
+            );
         }
         if ($profile) {
             Yii::endProfile($profile, 'system.db.EMongoGridFS');
