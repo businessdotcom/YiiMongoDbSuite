@@ -1,5 +1,15 @@
 <?php
 
+namespace YiiMongoDbSuite\extra;
+
+use \CException;
+use \DateTime;
+use \MongoBinData;
+use \MongoClient;
+use \MongoDate;
+use \MongoId;
+use \MongoRegex;
+
 /**
  * EMongoValidator verifies if the attribute is of the type specified by {@link type}.
  * Will also perform filtering if enabled.
@@ -16,7 +26,7 @@
  * @package     ext.YiiMongoDbSuite.extra
  * @since       v1.4.0
  */
-class EMongoValidator extends CValidator
+class EMongoValidator extends \CValidator
 {
     /**
      * Validate for a MongoId object

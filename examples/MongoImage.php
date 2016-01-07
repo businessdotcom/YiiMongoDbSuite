@@ -27,7 +27,7 @@
  * @package		ext.YiiMongoDbSuite
  *
  */
-class MongoImage extends EMongoGridFS
+class MongoImage extends \YiiMongoDbSuite\EMongoGridFS
 {
 	public $metadata;
 
@@ -38,18 +38,6 @@ class MongoImage extends EMongoGridFS
 	public function getCollectionName()
 	{
 		return 'images';
-	}
-
-	/**
-	 * Returns the static model of the specified AR class.
-	 *
-	 * @param string $className class name
-	 *
-	 * @return CompaniesDb the static model class
-	 */
-	public static function model($className=__CLASS__)
-	{
-		return parent::model($className);
 	}
 
 	public function rules()

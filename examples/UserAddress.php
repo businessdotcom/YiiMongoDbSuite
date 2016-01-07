@@ -1,5 +1,5 @@
 <?php
-class UserAddress extends EMongoEmbeddedDocuemnt
+class UserAddress extends \YiiMongoDbSuite\EMongoEmbeddedDocuemnt
 {
 	public $city;
 	public $street;

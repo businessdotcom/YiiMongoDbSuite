@@ -4,7 +4,7 @@
  * the soft attribute value's is null, the attribute will not be persisted.
  * Additionally, soft attributes are predefined in the class, not dynamically added.
  *
- * PHP version 5.2+
+ * PHP version 5.3+
  *
  * @author    Steven Hadfield <steven.hadfield@business.com>
  * @copyright 2014 Business.com Media Inc
@@ -14,6 +14,8 @@
  * @package   ext.YiiMongoDbSuite
  * @since     v1.4.0
  */
+
+namespace YiiMongoDbSuite;
 
 /**
  * EMongoSoftEmbeddedDocument class
@@ -106,7 +108,8 @@ abstract class EMongoSoftEmbeddedDocument extends EMongoEmbeddedDocument
     public function attributeNames()
     {
         return array_merge(
-            array_keys($this->softAttributes), parent::attributeNames()
+            array_keys($this->softAttributes),
+            parent::attributeNames()
         );
     }
 

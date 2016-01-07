@@ -1,6 +1,6 @@
 <?php
 
-class User extends EMongoDocument
+class User extends \YiiMongoDbSuite\EMongoDocument
 {
 	/**
 	 * A public variable should be defined for each key=>value you want in the
@@ -61,18 +61,6 @@ class User extends EMongoDocument
 			'client'			=> 'Client',
 			'company'			=> 'Company',
 		);
-	}
-
-	/**
-	 * Returns the class name just as nornal.
-	 *
-	 * @static
-	 * @param string $className
-	 * @return
-	 */
-	public static function model($className = __CLASS__)
-	{
-		return parent::model($className);
 	}
 
 	/**

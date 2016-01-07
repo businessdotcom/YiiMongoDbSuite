@@ -2,22 +2,28 @@
 /**
  * EMongoUniqueValidator.php
  *
- * PHP version 5.2+
+ * PHP version 5.3+
  *
- * @author		Dariusz Górecki <darek.krk@gmail.com>
- * @author		Invenzzia Group, open-source division of CleverIT company http://www.invenzzia.org
- * @copyright	2011 CleverIT http://www.cleverit.com.pl
- * @license		http://www.yiiframework.com/license/ BSD license
- * @version		1.3
- * @category	ext
- * @package		ext.YiiMongoDbSuite
- * @since		v1.1
+ * @author      Dariusz Górecki <darek.krk@gmail.com>
+ * @author      Invenzzia Group, open-source division of CleverIT company http://www.invenzzia.org
+ * @copyright   2011 CleverIT http://www.cleverit.com.pl
+ * @license     http://www.yiiframework.com/license/ BSD license
+ * @version     1.3
+ * @category    ext
+ * @package     ext.YiiMongoDbSuite
+ * @since       v1.1
  */
+
+namespace YiiMongoDbSuite\extra;
+
+use \YiiMongoDbSuite\EMongoCriteria;
+use \YiiMongoDbSuite\EMongoDocument;
+use \Yii;
 
 /**
  * @since v1.1
  */
-class EMongoUniqueValidator extends CValidator
+class EMongoUniqueValidator extends \CValidator
 {
     public $allowEmpty = true;
 
@@ -26,7 +32,7 @@ class EMongoUniqueValidator extends CValidator
      * If value is an array, it will be passed to the EMongoCriteria constructor as
      * 'conditions' parameter.
      * @var array|EMongoCriteria
-     * @see EMongoCritiera::__construct()
+     * @see EMongoCriteria::__construct()
      */
     public $criteria;
 
@@ -47,7 +53,9 @@ class EMongoUniqueValidator extends CValidator
         if (null === $value || '' === $value) {
             if (! $this->allowEmpty) {
                 $this->addError(
-                    $object, $attribute, Yii::t('yii', '{attribute} must be set')
+                    $object,
+                    $attribute,
+                    Yii::t('yii', '{attribute} must be set')
                 );
             }
 
@@ -65,7 +73,9 @@ class EMongoUniqueValidator extends CValidator
         }
         if (!$object->getIsNewRecord()) {
             $criteria->addCond(
-                $object->primaryKey(), '!=', $object->getPrimaryKey()
+                $object->primaryKey(),
+                '!=',
+                $object->getPrimaryKey()
             );
         }
         $criteria->addCond($attribute, '==', $value);
@@ -76,7 +86,9 @@ class EMongoUniqueValidator extends CValidator
 
         if (0 !== $count) {
             $this->addError(
-                $object, $attribute, Yii::t('yii', '{attribute} is not unique')
+                $object,
+                $attribute,
+                Yii::t('yii', '{attribute} is not unique')
             );
         }
     }

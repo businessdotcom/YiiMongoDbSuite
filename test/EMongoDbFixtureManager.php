@@ -2,13 +2,21 @@
 /**
  * EMongoDbFixtureManager
  *
- * @author		Philippe Gaultier <pgaultier@ibitux.com>
- * @copyright	2010-2011 Ibitux
- * @license		http://www.yiiframework.com/license/ BSD license
- * @category	tests
- * @package		ext.YiiMongoDbSuite.tests
- * @since		v1.3.6
+ * @author      Philippe Gaultier <pgaultier@ibitux.com>
+ * @copyright   2010-2011 Ibitux
+ * @license     http://www.yiiframework.com/license/ BSD license
+ * @category    tests
+ * @package     ext.YiiMongoDbSuite.tests
+ * @since       v1.3.6
  */
+
+namespace YiiMongoDbSuite\test;
+
+use \CException;
+use \MongoDB;
+use \Yii;
+use \YiiMongoDbSuite\EMongoDocument;
+use \YiiMongoDbSuite\EMongoGridFS;
 
 /**
  * EMongoDbFixtureManager manages simple mongodb fixtures during tests
@@ -33,54 +41,67 @@
  * the database. If this file is not found, all available fixtures will be loaded
  * into the database.
  *
- * @author		Philippe Gaultier <pgaultier@ibitux.com>
- * @copyright	2010-2011 Ibitux
- * @license		http://www.yiiframework.com/license/ BSD license
- * @category	tests
- * @package		ext.YiiMongoDbSuite.tests
- * @since		v1.3.6
+ * @author        Philippe Gaultier <pgaultier@ibitux.com>
+ * @copyright    2010-2011 Ibitux
+ * @license        http://www.yiiframework.com/license/ BSD license
+ * @category    tests
+ * @package        ext.YiiMongoDbSuite.tests
+ * @since        v1.3.6
  */
-class EMongoDbFixtureManager extends CApplicationComponent
+class EMongoDbFixtureManager extends \CApplicationComponent
 {
-	/**
-	 * @var string the name of the initialization script that would be executed before the whole test set runs.
-	 * Defaults to 'init.php'. If the script does not exist, every collection with a fixture file will be reset.
-	 */
-	public $initScript='init.php';
-	/**
-	 * @var string the suffix for fixture initialization scripts.
-	 * If a collection is associated with such a script whose name is CollectionName suffixed this property value,
-	 * then the script will be executed each time before the table is reset.
-	 */
-	public $initScriptSuffix='.init.php';
-	/**
-	 * @var string the base path containing all fixtures. Defaults to null, meaning
-	 * the path 'protected/tests/fixtures'.
-	 */
-	public $basePath;
-	/**
-	 * @var string the ID of the mongodb connection. Defaults to 'mongodb'.
-	 * Note, data in this database may be deleted or modified during testing.
-	 * Make sure you have a backup database.
-	 */
-	public $connectionID='mongodb';
+    /**
+     * @var string the name of the initialization script that would be executed before the whole test set runs.
+     * Defaults to 'init.php'. If the script does not exist, every collection with a fixture file will be reset.
+     */
+    public $initScript = 'init.php';
+    /**
+     * @var string the suffix for fixture initialization scripts.
+     * If a collection is associated with such a script whose name is CollectionName suffixed this property value,
+     * then the script will be executed each time before the table is reset.
+     */
+    public $initScriptSuffix = '.init.php';
+    /**
+     * @var string the base path containing all fixtures. Defaults to null, meaning
+     * the path 'protected/tests/fixtures'.
+     */
+    public $basePath;
+    /**
+     * @var string the ID of the mongodb connection. Defaults to 'mongodb'.
+     * Note, data in this database may be deleted or modified during testing.
+     * Make sure you have a backup database.
+     */
+    public $connectionID = 'mongodb';
 
-	private $_mongoDb;
-	private $_fixtures;
-	private $_rows;				// fixture name, row alias => row
-	private $_records;			// fixture name, row alias => record (or class name)
-	private $_collectionList;	// list of collections available in database
+    private $_mongoDb;
+    private $_fixtures;
+    /**
+     * fixture name, row alias => row
+     * @var array
+     */
+    private $_rows;
+    /**
+     * fixture name, row alias => record (or class name)
+     * @var array
+     */
+    private $_records;
+    /**
+     * list of collections available in database
+     * @var array
+     */
+    private $_collectionList;
 
-	/**
-	 * Initializes this application component.
-	 */
-	public function init()
-	{
-		parent::init();
-		if($this->basePath===null)
-			$this->basePath=Yii::getPathOfAlias('application.tests.fixtures');
-		$this->prepare();
-	}
+    /**
+     * Initializes this application component.
+     */
+    public function init()
+    {
+        parent::init();
+        if ($this->basePath === null) {
+            $this->basePath = Yii::getPathOfAlias('application.tests.fixtures');
+        }
+        $this->prepare();
+    }
 
     /**
      * Returns the database connection used to load fixtures.
@@ -106,133 +127,133 @@ class EMongoDbFixtureManager extends CApplicationComponent
         return $this->_mongoDb;
     }
 
-	/**
-	 * Prepares the fixtures for the whole test.
-	 * This method is invoked in {@link init}. It executes the database init script
-	 * if it exists. Otherwise, it will load all available fixtures.
-	 */
-	public function prepare()
-	{
-		$initFile=$this->basePath . DIRECTORY_SEPARATOR . $this->initScript;
-		if(is_file($initFile))
-			require($initFile);
-		else
-		{
-			foreach($this->getFixtures() as $collectionName=>$fixturePath)
-			{
-				$this->resetCollection($collectionName);
-				$this->loadFixture($collectionName);
-			}
-		}
-	}
+    /**
+     * Prepares the fixtures for the whole test.
+     * This method is invoked in {@link init}. It executes the database init script
+     * if it exists. Otherwise, it will load all available fixtures.
+     */
+    public function prepare()
+    {
+        $initFile=$this->basePath . DIRECTORY_SEPARATOR . $this->initScript;
+        if (is_file($initFile)) {
+            require $initFile;
+        } else {
+            foreach ($this->getFixtures() as $collectionName => $fixturePath) {
+                $this->resetCollection($collectionName);
+                $this->loadFixture($collectionName);
+            }
+        }
+    }
 
-	/**
-	 * Resets the collection to the state that it contains no fixture data.
-	 * If there is an init script named "tests/fixtures/CollectionName.init.php",
-	 * the script will be executed.
-	 * Otherwise, {@link truncateCollection} will be invoked to delete all documents
-	 * in the collection.
-	 * @param string $collectionName the collection name
-	 */
-	public function resetCollection($collectionName)
-	{
-		$initFile=$this->basePath . DIRECTORY_SEPARATOR . $collectionName . $this->initScriptSuffix;
-		if(is_file($initFile))
-			require($initFile);
-		else
-			$this->truncateCollection($collectionName);
-	}
+    /**
+     * Resets the collection to the state that it contains no fixture data.
+     * If there is an init script named "tests/fixtures/CollectionName.init.php",
+     * the script will be executed.
+     * Otherwise, {@link truncateCollection} will be invoked to delete all documents
+     * in the collection.
+     * @param string $collectionName the collection name
+     */
+    public function resetCollection($collectionName)
+    {
+        $initFile=$this->basePath . DIRECTORY_SEPARATOR . $collectionName . $this->initScriptSuffix;
+        if (is_file($initFile)) {
+            require $initFile;
+        } else {
+            $this->truncateCollection($collectionName);
+        }
+    }
 
-	/**
-	 * Loads the fixture for the specified collection.
-	 * This method will insert documents given in the fixture into the corresponding collection.
-	 * The loaded documents will be returned by this method.
-	 * If the fixture does not exist, this method will return false.
-	 * Note, you may want to call {@link resetCollection} before calling this method
-	 * so that the collection is emptied first.
-	 * @param string $collectionName collection name
-	 * @return array the loaded fixture rows indexed by row aliases (if any).
-	 * False is returned if the collection does not have a fixture.
-	 */
-	public function loadFixture($collectionName)
-	{
-		$fileName=$this->basePath.DIRECTORY_SEPARATOR.$collectionName.'.php';
-		if(!is_file($fileName))
-			return false;
+    /**
+     * Loads the fixture for the specified collection.
+     * This method will insert documents given in the fixture into the corresponding collection.
+     * The loaded documents will be returned by this method.
+     * If the fixture does not exist, this method will return false.
+     * Note, you may want to call {@link resetCollection} before calling this method
+     * so that the collection is emptied first.
+     * @param string $collectionName collection name
+     * @return array the loaded fixture rows indexed by row aliases (if any).
+     * False is returned if the collection does not have a fixture.
+     */
+    public function loadFixture($collectionName)
+    {
+        $fileName=$this->basePath.DIRECTORY_SEPARATOR.$collectionName.'.php';
+        if (!is_file($fileName)) {
+            return false;
+        }
 
-		$rows=array();
-		foreach(require($fileName) as $alias=>$row)
-		{
-			$this->getDbConnection()->{$collectionName}->save($row);
-			$rows[$alias]=$row;
-		}
-		return $rows;
-	}
+        $rows = array();
+        foreach (require($fileName) as $alias => $row) {
+            $this->getDbConnection()->{$collectionName}->save($row);
+            $rows[$alias] = $row;
+        }
+        return $rows;
+    }
 
-	/**
-	 * Check if requested collection exists
-	 * @param string $collectionName collection name
-	 * @return boolean
-	 */
-	protected function isCollection($collectionName) {
-		if ($this->_collectionList === null) {
-			$this->_collectionList = array();
-			foreach($this->getDbConnection()->listCollections() as $collection) {
-				$this->_collectionList[] = $collection->getName();
-			}
-		}
-		return in_array($collectionName, $this->_collectionList);
-	}
-	/**
-	 * Returns the information of the available fixtures.
-	 * This method will search for all PHP files under {@link basePath}.
-	 * If a file's name is the same as a collection name, it is considered to be the fixture data for that table.
-	 * @return array the information of the available fixtures (collection name => fixture file)
-	 */
-	public function getFixtures()
-	{
-		if($this->_fixtures===null)
-		{
-			$this->_fixtures=array();
-			$folder=opendir($this->basePath);
-			$suffixLen=strlen($this->initScriptSuffix);
-			while($file=readdir($folder))
-			{
-				if($file==='.' || $file==='..' || $file===$this->initScript)
-					continue;
-				$path=$this->basePath.DIRECTORY_SEPARATOR.$file;
-				if(substr($file,-4)==='.php' && is_file($path) && substr($file,-$suffixLen)!==$this->initScriptSuffix)
-				{
-					$collectionName=substr($file,0,-4);
-					if($this->isCollection($collectionName) === true)
-					{
-						$this->_fixtures[$collectionName]=$path;
-					}
-				}
-			}
-			closedir($folder);
-		}
-		return $this->_fixtures;
-	}
+    /**
+     * Check if requested collection exists
+     * @param string $collectionName collection name
+     * @return boolean
+     */
+    protected function isCollection($collectionName)
+    {
+        if ($this->_collectionList === null) {
+            $this->_collectionList = array();
+            foreach ($this->getDbConnection()->listCollections() as $collection) {
+                $this->_collectionList[] = $collection->getName();
+            }
+        }
+        return in_array($collectionName, $this->_collectionList);
+    }
+    /**
+     * Returns the information of the available fixtures.
+     * This method will search for all PHP files under {@link basePath}.
+     * If a file's name is the same as a collection name, it is considered to be the fixture data for that table.
+     * @return array the information of the available fixtures (collection name => fixture file)
+     */
+    public function getFixtures()
+    {
+        if ($this->_fixtures === null) {
+            $this->_fixtures = array();
+            $folder=opendir($this->basePath);
+            $suffixLen=strlen($this->initScriptSuffix);
+            while ($file=readdir($folder)) {
+                if ($file === '.' || $file === '..' || $file === $this->initScript) {
+                    continue;
+                }
+                $path=$this->basePath.DIRECTORY_SEPARATOR.$file;
+                if (substr($file, -4) === '.php' && is_file($path)
+                    && substr($file, -$suffixLen) !== $this->initScriptSuffix
+                ) {
+                    $collectionName = substr($file, 0, -4);
+                    if ($this->isCollection($collectionName) === true) {
+                        $this->_fixtures[$collectionName] = $path;
+                    }
+                }
+            }
+            closedir($folder);
+        }
+        return $this->_fixtures;
+    }
 
-	/**
-	 * Removes all documents from the specified collection.
-	 * @param string $collectionName the collection name
-	 */
-	public function truncateCollection($collectionName)
-	{
-		$this->getDbConnection()->{$collectionName}->remove(array());
-	}
+    /**
+     * Removes all documents from the specified collection.
+     * @param string $collectionName the collection name
+     */
+    public function truncateCollection($collectionName)
+    {
+        $this->getDbConnection()->{$collectionName}->remove(array());
+    }
 
-	/**
-	 * Truncates all collections.
-	 * @see truncateCollection
-	 */
-	public function truncateCollections()
-	{
-		foreach($this->getDbConnection()->listCollections() as $collection)
-				$this->truncateCollection($collection->getName());
-	}
+    /**
+     * Truncates all collections.
+     * @see truncateCollection
+     */
+    public function truncateCollections()
+    {
+        foreach ($this->getDbConnection()->listCollections() as $collection) {
+            $this->truncateCollection($collection->getName());
+        }
+    }
 
     /**
      * Loads the specified fixtures.

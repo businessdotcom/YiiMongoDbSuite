@@ -2,118 +2,129 @@
 /**
  * EMongoEmbeddedDocument.php
  *
- * PHP version 5.2+
+ * PHP version 5.3+
  *
- * @author		Dariusz Górecki <darek.krk@gmail.com>
- * @author		Invenzzia Group, open-source division of CleverIT company http://www.invenzzia.org
- * @copyright	2011 CleverIT http://www.cleverit.com.pl
- * @license		http://www.yiiframework.com/license/ BSD license
- * @version		1.3
- * @category	ext
- * @package		ext.YiiMongoDbSuite
- * @since		v1.0.8
+ * @author      Dariusz Górecki <darek.krk@gmail.com>
+ * @author      Invenzzia Group, open-source division of CleverIT company http://www.invenzzia.org
+ * @copyright   2011 CleverIT http://www.cleverit.com.pl
+ * @license     http://www.yiiframework.com/license/ BSD license
+ * @version     1.3
+ * @category    ext
+ * @package     ext.YiiMongoDbSuite
+ * @since       v1.0.8
  */
+
+namespace YiiMongoDbSuite;
+
+use \CException;
+use \CMap;
+use \CModelEvent;
+use \ReflectionClass;
 
 /**
  * @since v1.0.8
  */
-abstract class EMongoEmbeddedDocument extends CModel
+abstract class EMongoEmbeddedDocument extends \CModel
 {
-	private static $_attributes=array();
+    private static $_attributes = array();
 
-	/**
-	 * CMap of embedded documents
-	 * @var CMap $_embedded
-	 * @since v1.0.8
-	 */
-	protected $_embedded=null;
+    /**
+     * CMap of embedded documents
+     * @var CMap $_embedded
+     * @since v1.0.8
+     */
+    protected $_embedded = null;
 
-	/**
-	 * Cached values for embeddedDocuments() method
-	 * @var array $_embeddedConfig
-	 * @since v1.3.2
-	 */
-	protected static $_embeddedConfig = array();
+    /**
+     * Cached values for embeddedDocuments() method
+     * @var array $_embeddedConfig
+     * @since v1.3.2
+     */
+    protected static $_embeddedConfig = array();
 
-	/**
-	 * Hold down owner pointer (if any)
-	 *
-	 * @var EMongoEmbeddedDocument $_owner
-	 * @since v1.0.8
-	 */
-	protected $_owner=null;
+    /**
+     * Hold down owner pointer (if any)
+     *
+     * @var EMongoEmbeddedDocument $_owner
+     * @since v1.0.8
+     */
+    protected $_owner = null;
 
-	/**
-	 * Constructor.
-	 * @param string $scenario name of the scenario that this model is used in.
-	 * See {@link CModel::scenario} on how scenario is used by models.
-	 * @see getScenario
-	 * @since v1.0.8
-	 */
-	public function __construct($scenario='insert')
-	{
-		$this->setScenario($scenario);
-		$this->init();
-		$this->attachBehaviors($this->behaviors());
-		$this->afterConstruct();
+    /**
+     * Constructor.
+     * @param string $scenario name of the scenario that this model is used in.
+     * See {@link CModel::scenario} on how scenario is used by models.
+     * @see getScenario
+     * @since v1.0.8
+     */
+    public function __construct($scenario = 'insert')
+    {
+        $this->setScenario($scenario);
+        $this->init();
+        $this->attachBehaviors($this->behaviors());
+        $this->afterConstruct();
 
-		$this->initEmbeddedDocuments();
-	}
+        $this->initEmbeddedDocuments();
+    }
 
-	/**
-	 * Initializes this model.
-	 * This method is invoked in the constructor right after {@link scenario} is set.
-	 * You may override this method to provide code that is needed to initialize the model (e.g. setting
-	 * initial property values.)
-	 * @since 1.0.8
-	 */
-	public function init(){}
+    /**
+     * Initializes this model.
+     * This method is invoked in the constructor right after {@link scenario} is set.
+     * You may override this method to provide code that is needed to initialize the model (e.g. setting
+     * initial property values.)
+     * @since 1.0.8
+     */
+    public function init()
+    {
+    }
 
-	/**
-	 * @since v1.0.8
-	 */
-	protected function initEmbeddedDocuments()
-	{
-		if(!$this->hasEmbeddedDocuments() || !$this->beforeEmbeddedDocsInit())
-			return false;
+    /**
+     * @since v1.0.8
+     */
+    protected function initEmbeddedDocuments()
+    {
+        if (!$this->hasEmbeddedDocuments() || !$this->beforeEmbeddedDocsInit()) {
+            return false;
+        }
 
-		$this->_embedded = new CMap;
-		if(!isset(self::$_embeddedConfig[get_class($this)]))
-			self::$_embeddedConfig[get_class($this)] = $this->embeddedDocuments();
-		$this->afterEmbeddedDocsInit();
-	}
+        $this->_embedded = new CMap;
+        if (!isset(self::$_embeddedConfig[get_class($this)])) {
+            self::$_embeddedConfig[get_class($this)] = $this->embeddedDocuments();
+        }
+        $this->afterEmbeddedDocsInit();
+    }
 
-	/**
-	 * @since v1.0.8
-	 */
-	public function onBeforeEmbeddedDocsInit($event)
-	{
-		$this->raiseEvent('onBeforeEmbeddedDocsInit', $event);
-	}
+    /**
+     * @since v1.0.8
+     */
+    public function onBeforeEmbeddedDocsInit($event)
+    {
+        $this->raiseEvent('onBeforeEmbeddedDocsInit', $event);
+    }
 
-	/**
-	 * @since v1.0.8
-	 */
-	public function onAfterEmbeddedDocsInit($event)
-	{
-		$this->raiseEvent('onAfterEmbeddedDocsInit', $event);
-	}
+    /**
+     * @since v1.0.8
+     */
+    public function onAfterEmbeddedDocsInit($event)
+    {
+        $this->raiseEvent('onAfterEmbeddedDocsInit', $event);
+    }
 
-	/**
-	 * @since v1.0.8
-	 */
-	public function onBeforeToArray($event)
-	{
-		$this->raiseEvent('onBeforeToArray', $event);
-	}
+    /**
+     * @since v1.0.8
+     */
+    public function onBeforeToArray($event)
+    {
+        $this->raiseEvent('onBeforeToArray', $event);
+    }
 
-	/**
-	 * @since v1.0.8
-	 */
-	public function onAfterToArray($event)
-	{
-		$this->raiseEvent('onAfterToArray', $event);
-	}
+    /**
+     * @since v1.0.8
+     */
+    public function onAfterToArray($event)
+    {
+        $this->raiseEvent('onAfterToArray', $event);
+    }
 
     /**
      * Method to determine whether an array conversion should be allowed to continue
@@ -128,13 +139,13 @@ abstract class EMongoEmbeddedDocument extends CModel
         return $event->isValid;
     }
 
-	/**
-	 * @since v1.0.8
-	 */
-	protected function afterToArray()
-	{
-		$this->onAfterToArray(new CModelEvent($this));
-	}
+    /**
+     * @since v1.0.8
+     */
+    protected function afterToArray()
+    {
+        $this->onAfterToArray(new CModelEvent($this));
+    }
 
     /**
      * Method to determine whether a call to initialize embedded documents should be
@@ -150,13 +161,13 @@ abstract class EMongoEmbeddedDocument extends CModel
         return $event->isValid;
     }
 
-	/**
-	 * @since v1.0.8
-	 */
-	protected function afterEmbeddedDocsInit()
-	{
-		$this->onAfterEmbeddedDocsInit(new CModelEvent($this));
-	}
+    /**
+     * @since v1.0.8
+     */
+    protected function afterEmbeddedDocsInit()
+    {
+        $this->onAfterEmbeddedDocsInit(new CModelEvent($this));
+    }
 
     /**
      * @since v1.0.8
@@ -338,7 +349,8 @@ abstract class EMongoEmbeddedDocument extends CModel
             }
             if ($this->hasEmbeddedDocuments()) {
                 $names = array_merge(
-                    $names, array_keys(self::$_embeddedConfig[$className])
+                    $names,
+                    array_keys(self::$_embeddedConfig[$className])
                 );
             }
             self::$_attributes[$className] = $names;
@@ -347,23 +359,22 @@ abstract class EMongoEmbeddedDocument extends CModel
         return self::$_attributes[$className];
     }
 
-	/**
-	 * Returns the given object as an associative array
-	 * Fires beforeToArray and afterToArray events
-	 * @return array an associative array of the contents of this object
-	 * @since v1.0.8
-	 */
-	public function toArray()
-	{
-		if($this->beforeToArray())
-		{
-			$arr = $this->_toArray();
-			$this->afterToArray();
-			return $arr;
-		}
-		else
-			return array();
-	}
+    /**
+     * Returns the given object as an associative array
+     * Fires beforeToArray and afterToArray events
+     * @return array an associative array of the contents of this object
+     * @since v1.0.8
+     */
+    public function toArray()
+    {
+        if ($this->beforeToArray()) {
+            $arr = $this->_toArray();
+            $this->afterToArray();
+            return $arr;
+        } else {
+            return array();
+        }
+    }
 
     /**
      * This method does the actual convertion to an array.
@@ -416,20 +427,20 @@ abstract class EMongoEmbeddedDocument extends CModel
         $this->_owner = $owner;
     }
 
-	/**
-	 * Override default seScenario method for populating to embedded records
-	 * @see CModel::setScenario()
-	 * @since v1.0.8
-	 */
-	public function setScenario($value)
-	{
-		if($this->hasEmbeddedDocuments() && $this->_embedded !== null)
-		{
-			foreach($this->_embedded as $doc)
-				$doc->setScenario($value);
-		}
-		parent::setScenario($value);
-	}
+    /**
+     * Override default seScenario method for populating to embedded records
+     * @see CModel::setScenario()
+     * @since v1.0.8
+     */
+    public function setScenario($value)
+    {
+        if ($this->hasEmbeddedDocuments() && $this->_embedded !== null) {
+            foreach ($this->_embedded as $doc) {
+                $doc->setScenario($value);
+            }
+        }
+        parent::setScenario($value);
+    }
 
     /**
      * Validate current document and all loaded or specified embedded documents.

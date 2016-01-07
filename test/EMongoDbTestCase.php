@@ -4,13 +4,17 @@
  *
  * base class for unit testing
  *
- * @author		Philippe Gaultier <pgaultier@ibitux.com>
- * @copyright	2010-2011 Ibitux
- * @license		http://www.yiiframework.com/license/ BSD license
- * @category	tests
- * @package		ext.YiiMongoDbSuite.tests
- * @since		v1.3.6
+ * @author        Philippe Gaultier <pgaultier@ibitux.com>
+ * @copyright    2010-2011 Ibitux
+ * @license        http://www.yiiframework.com/license/ BSD license
+ * @category    tests
+ * @package        ext.YiiMongoDbSuite.tests
+ * @since        v1.3.6
  */
+
+namespace YiiMongoDbSuite\test;
+
+use \Yii;
 
 Yii::import('system.test.CDbTestCase');
 
@@ -19,14 +23,14 @@ Yii::import('system.test.CDbTestCase');
  *
  * Simplifies specifying the component id of the DB fixture manager
  *
- * @author		Philippe Gaultier <pgaultier@ibitux.com>
- * @copyright	2010-2011 Ibitux
- * @license		http://www.yiiframework.com/license/ BSD license
- * @category	tests
- * @package		ext.YiiMongoDbSuite.tests
- * @since		v1.3.6
+ * @author      Philippe Gaultier <pgaultier@ibitux.com>
+ * @copyright   2010-2011 Ibitux
+ * @license     http://www.yiiframework.com/license/ BSD license
+ * @category    tests
+ * @package     ext.YiiMongoDbSuite.tests
+ * @since       v1.3.6
  */
-abstract class EMongoDbTestCase extends CDbTestCase
+abstract class EMongoDbTestCase extends \CDbTestCase
 {
     /**
      * Yii application component ID for the EMongoDbFixtureManager
@@ -43,5 +47,4 @@ abstract class EMongoDbTestCase extends CDbTestCase
     {
         return Yii::app()->getComponent($this->fixtureComponentId);
     }
-
 }

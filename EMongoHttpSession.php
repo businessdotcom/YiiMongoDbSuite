@@ -1,13 +1,19 @@
 <?php
 
 /**
- * @author Ianaré Sévi (merge into EMongoDB)
- * @author aoyagikouhei (original author)
- * @license New BSD license
- * @version 1.3
+ * @author   Ianaré Sévi (merge into EMongoDB)
+ * @author   aoyagikouhei (original author)
+ * @license  New BSD license
+ * @version  1.3
  * @category ext
- * @package ext.YiiMongoDbSuite
+ * @package  ext.YiiMongoDbSuite
  */
+
+namespace YiiMongoDbSuite;
+
+use \CLogger;
+use \MongoException;
+use \Yii;
 
 /**
  * EMongoHttpSession
@@ -32,7 +38,7 @@
  * queryTimeout         : timeout miliseconds           : default null
  *
  */
-class EMongoHttpSession extends CHttpSession
+class EMongoHttpSession extends \CHttpSession
 {
     /**
      * @var string Mongo DB component.
@@ -138,13 +144,16 @@ class EMongoHttpSession extends CHttpSession
                 )
             );
             $profile = EMongoCriteria::findToString(
-                $criteria, false, $this->collectionName
+                $criteria,
+                false,
+                $this->collectionName
             );
             Yii::beginProfile($profile, 'system.db.EMongoHttpSession');
         }
         try {
             $data = $this->_collection->findOne(
-                array($this->idColumn => $id), array($this->dataColumn => true)
+                array($this->idColumn => $id),
+                array($this->dataColumn => true)
             );
         } catch (MongoException $ex) {
             // Try again if switching master or timeout
@@ -155,7 +164,8 @@ class EMongoHttpSession extends CHttpSession
             );
 
             $data = $this->_collection->findOne(
-                array($this->idColumn => $id), array($this->dataColumn => true)
+                array($this->idColumn => $id),
+                array($this->dataColumn => true)
             );
         }
         if ($this->profiler && isset($profile)) {
@@ -228,13 +238,18 @@ class EMongoHttpSession extends CHttpSession
         );
         if ($this->profiler) {
             $profile = EMongoCriteria::commandToString(
-                'update', $this->collectionName, $data, array('upsert' => true)
+                'update',
+                $this->collectionName,
+                $data,
+                array('upsert' => true)
             );
             Yii::beginProfile($profile, 'system.db.EMongoHttpSession');
         }
         try {
             $result = $this->_collection->update(
-                array($this->idColumn => $id), $data, $options
+                array($this->idColumn => $id),
+                $data,
+                $options
             );
         } catch (MongoException $ex) {
             // Try again if switching master or timeout
@@ -245,7 +260,9 @@ class EMongoHttpSession extends CHttpSession
             );
 
             $result = $this->_collection->update(
-                array($this->idColumn => $id), $data, $options
+                array($this->idColumn => $id),
+                $data,
+                $options
             );
         }
         if ($this->profiler && isset($profile)) {
@@ -267,13 +284,16 @@ class EMongoHttpSession extends CHttpSession
     {
         if ($this->profiler) {
             $profile = EMongoCriteria::commandToString(
-                'remove', $this->collectionName, array($this->idColumn => $id)
+                'remove',
+                $this->collectionName,
+                array($this->idColumn => $id)
             );
             Yii::beginProfile($profile, 'system.db.EMongoHttpSession');
         }
         try {
             $result = $this->_collection->remove(
-                array($this->idColumn => $id), $this->_options
+                array($this->idColumn => $id),
+                $this->_options
             );
         } catch (MongoException $ex) {
             // Try again if switching master or timeout
@@ -284,7 +304,8 @@ class EMongoHttpSession extends CHttpSession
             );
 
             $result = $this->_collection->remove(
-                array($this->idColumn => $id), $this->_options
+                array($this->idColumn => $id),
+                $this->_options
             );
         }
         if ($this->profiler && isset($profile)) {
@@ -308,7 +329,9 @@ class EMongoHttpSession extends CHttpSession
         $query = array($this->expireColumn => array('$lt' => time()));
         if ($this->profiler) {
             $profile = EMongoCriteria::commandToString(
-                'remove', $this->collectionName, $query
+                'remove',
+                $this->collectionName,
+                $query
             );
             Yii::beginProfile($profile, 'system.db.EMongoHttpSession');
         }
@@ -351,7 +374,9 @@ class EMongoHttpSession extends CHttpSession
             );
             if ($this->profiler) {
                 $profile = EMongoCriteria::commandToString(
-                    'insert', $this->collectionName, $data
+                    'insert',
+                    $this->collectionName,
+                    $data
                 );
                 Yii::beginProfile($profile, 'system.db.EMongoHttpSession');
             }
@@ -370,7 +395,8 @@ class EMongoHttpSession extends CHttpSession
         } elseif ($deleteOldSession && '_id' !== $this->idColumn) {
             if ($this->profiler) {
                 $profile = EMongoCriteria::commandToString(
-                    'update', $this->collectionName,
+                    'update',
+                    $this->collectionName,
                     array($this->idColumn => $oldId),
                     array($this->idColumn => $newId)
                 );
@@ -401,7 +427,9 @@ class EMongoHttpSession extends CHttpSession
             $row[$this->idColumn] = $newId;
             if ($this->profiler) {
                 $profile = EMongoCriteria::commandToString(
-                    'insert', $this->collectionName, $row
+                    'insert',
+                    $this->collectionName,
+                    $row
                 );
                 Yii::beginProfile($profile, 'system.db.EMongoHttpSession');
             }

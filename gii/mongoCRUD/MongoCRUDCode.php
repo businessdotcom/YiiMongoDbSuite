@@ -14,6 +14,8 @@
  * @since		v1.2.2
  */
 
+use \YiiMongoDbSuite\EMongoDocument;
+
 /**
  * @since v1.2.2
  */

@@ -3,17 +3,29 @@
  * EMongoDocument.php
  *
  * PHP version 5.3+
- * Mongo version 1.0.5+
+ * Mongo version 1.5+
  *
- * @author		Dariusz Górecki <darek.krk@gmail.com>
- * @author		Invenzzia Group, open-source division of CleverIT company http://www.invenzzia.org
- * @copyright	2011 CleverIT http://www.cleverit.com.pl
- * @license		http://www.yiiframework.com/license/ BSD license
- * @version		1.3
- * @category	ext
- * @package		ext.YiiMongoDbSuite
- * @since		v1.0
+ * @author      Dariusz Górecki <darek.krk@gmail.com>
+ * @author      Invenzzia Group, open-source division of CleverIT company http://www.invenzzia.org
+ * @copyright   2011 CleverIT http://www.cleverit.com.pl
+ * @license     http://www.yiiframework.com/license/ BSD license
+ * @version     1.3
+ * @category    ext
+ * @package     ext.YiiMongoDbSuite
+ * @since       v1.0
  */
+
+namespace YiiMongoDbSuite;
+
+use \CDbException;
+use \CEvent;
+use \CLogger;
+use \CModelEvent;
+use \MongoCollection;
+use \MongoCursorException;
+use \MongoException;
+use \MongoRegex;
+use \Yii;
 
 /**
  * EMongoDocument
@@ -23,24 +35,37 @@
  */
 abstract class EMongoDocument extends EMongoEmbeddedDocument
 {
-	private					$_new			= false;		// whether this instance is new or not
-	private					$_criteria		= null;			// query criteria (used by finder only)
+    /**
+     * whether this instance is new or not
+     * @var boolean
+     */
+    private $_new      = false;
+    /**
+     * query criteria (used by finder only)
+     * @var EMongoCriteria
+     */
+    private $_criteria = null;
 
-	/**
-	 * Static array that holds mongo collection object instances,
-	 * protected access since v1.3
-	 *
-	 * @var array $_collections static array of loaded collection objects
-	 * @since v1.3
-	 */
-	protected	static		$_collections	= array();		// MongoCollection object
+    /**
+     * Static array that holds mongo collection object instances,
+     * protected access since v1.3
+     *
+     * @var MongoCollection[] $_collections static array of loaded collection objects
+     * @since v1.3
+     */
+    protected static $_collections = array();
 
-	private		static		$_models		= array();
-	private		static		$_indexes		= array();		// Hold collection indexes array
+    private static $_models        = array();
+
+    /**
+     * Hold collection indexes array
+     * @var array
+     */
+    private static $_indexes       = array();
 
     /**
      * Object level Journaling flag
-     * @var boolean
+     * @var boolean|null
      */
     private $_journalFlag = null;
 
@@ -48,9 +73,13 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
      * Object level write concern flag
      * @var integer|string
      */
-    private $_writeConcern	= null;
+    private $_writeConcern    = null;
 
-	protected				$useCursor		= null;			// Whatever to return cursor instead on raw array
+    /**
+     * Whatever to return cursor instead on raw array
+     * @var boolean|null
+     */
+    protected $useCursor = null;
 
     /**
      * @var boolean $ensureIndexes whatever to check and create non existing indexes of collection
@@ -81,81 +110,82 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
      */
     protected static $_emongoDb;
 
-	/**
-	 * MongoDB special field, every document has to have this
-	 *
-	 * @var mixed $_id
-	 * @since v1.0
-	 */
-	public $_id;
+    /**
+     * MongoDB special field, every document has to have this
+     *
+     * @var mixed $_id
+     * @since v1.0
+     */
+    public $_id;
 
-	/**
-	 * Add scopes functionality
-	 * @see CComponent::__call()
-	 * @since v1.0
-	 */
-	public function __call($name, $parameters)
-	{
-		$scopes=$this->scopes();
-		if(isset($scopes[$name]))
-		{
-			$this->getDbCriteria()->mergeWith($scopes[$name]);
-			return $this;
-		}
+    /**
+     * Add scopes functionality
+     * @see CComponent::__call()
+     * @since v1.0
+     */
+    public function __call($name, $parameters)
+    {
+        $scopes=$this->scopes();
+        if (isset($scopes[$name])) {
+            $this->getDbCriteria()->mergeWith($scopes[$name]);
+            return $this;
+        }
 
-		return parent::__call($name,$parameters);
-	}
+        return parent::__call($name, $parameters);
+    }
 
-	/**
-	 * Constructor {@see setScenario()}
-	 *
-	 * @param string $scenario
-	 * @since v1.0
-	 */
-	public function __construct($scenario='insert')
-	{
-		if($scenario==null) // internally used by populateRecord() and model()
-			return;
+    /**
+     * Constructor {@see setScenario()}
+     *
+     * @param string $scenario
+     * @since v1.0
+     */
+    public function __construct($scenario = 'insert')
+    {
+        // internally used by populateRecord() and model()
+        if ($scenario==null) {
+            return;
+        }
 
-		$this->setScenario($scenario);
-		$this->setIsNewRecord(true);
+        $this->setScenario($scenario);
+        $this->setIsNewRecord(true);
 
-		$this->init();
+        $this->init();
 
-		$this->attachBehaviors($this->behaviors());
-		$this->afterConstruct();
+        $this->attachBehaviors($this->behaviors());
+        $this->afterConstruct();
 
-		$this->initEmbeddedDocuments();
-	}
+        $this->initEmbeddedDocuments();
+    }
 
-	/**
-	 * Return the primary key field for this collection, defaults to '_id'
-	 * @return string|array field name, or array of fields for composite primary key
-	 * @since v1.2.2
-	 */
-	public function primaryKey()
-	{
-		return '_id';
-	}
+    /**
+     * Return the primary key field for this collection, defaults to '_id'
+     * @return string|array field name, or array of fields for composite primary key
+     * @since v1.2.2
+     */
+    public function primaryKey()
+    {
+        return '_id';
+    }
 
 
-	/**
-	 * @since v1.2.2
-	 */
-	public function getPrimaryKey()
-	{
-		$pk = $this->primaryKey();
-		if(is_string($pk))
-			return $this->{$pk};
-		else
-		{
-			$return = array();
-			foreach($pk as $pkFiled)
-				$return[] = $this->{$pkFiled};
+    /**
+     * @since v1.2.2
+     */
+    public function getPrimaryKey()
+    {
+        $pk = $this->primaryKey();
+        if (is_string($pk)) {
+            return $this->{$pk};
+        } else {
+            $return = array();
+            foreach ($pk as $pkFiled) {
+                $return[] = $this->{$pkFiled};
+            }
 
-			return $return;
-		}
-	}
+            return $return;
+        }
+    }
 
     /**
      * Get EMongoDB component instance
@@ -198,108 +228,113 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
         self::$_emongoDb[$componentId] = $component;
     }
 
-	/**
-	 * Get raw MongoDB instance
-	 * @return MongoDB
-	 * @since v1.0
-	 */
-	public function getDb()
-	{
-		return $this->getMongoDBComponent()->getDbInstance();
-	}
+    /**
+     * Get raw MongoDB instance
+     * @return MongoDB
+     * @since v1.0
+     */
+    public function getDb()
+    {
+        return $this->getMongoDBComponent()->getDbInstance();
+    }
 
-	/**
-	 * This method must return collection name for use with this model
-	 * this must be implemented in child classes
-	 *
-	 * this is read-only defined only at class define
-	 * if you whant to set different colection during run-time
-	 * use {@see setCollection()}
-	 *
-	 * @return string collection name
-	 * @since v1.0
-	 */
-	abstract public function getCollectionName();
+    /**
+     * This method must return collection name for use with this model
+     * this must be implemented in child classes
+     *
+     * this is read-only defined only at class define
+     * if you whant to set different colection during run-time
+     * use {@see setCollection()}
+     *
+     * @return string collection name
+     * @since v1.0
+     */
+    abstract public function getCollectionName();
 
-	/**
-	 * Returns current MongoCollection object
-	 * By default this method use {@see getCollectionName()}
-	 * @return MongoCollection
-	 * @since v1.0
-	 */
-	public function getCollection()
-	{
-		if(!isset(self::$_collections[$this->getCollectionName()]))
-			self::$_collections[$this->getCollectionName()] = $this->getDb()->selectCollection($this->getCollectionName());
+    /**
+     * Returns current MongoCollection object
+     * By default this method use {@see getCollectionName()}
+     * @return MongoCollection
+     * @since v1.0
+     */
+    public function getCollection()
+    {
+        if (!isset(self::$_collections[$this->getCollectionName()])) {
+            self::$_collections[$this->getCollectionName()]
+                = $this->getDb()->selectCollection($this->getCollectionName());
+        }
 
-		return self::$_collections[$this->getCollectionName()];
-	}
+        return self::$_collections[$this->getCollectionName()];
+    }
 
-	/**
-	 * Set current MongoCollection object
-	 * @param MongoCollection $collection
-	 * @since v1.0
-	 */
-	public function setCollection(MongoCollection $collection)
-	{
-		self::$_collections[$this->getCollectionName()] = $collection;
-	}
+    /**
+     * Set current MongoCollection object
+     * @param MongoCollection $collection
+     * @since v1.0
+     */
+    public function setCollection(MongoCollection $collection)
+    {
+        self::$_collections[$this->getCollectionName()] = $collection;
+    }
 
-	/**
-	 * Returns if the current record is new.
-	 * @return boolean whether the record is new and should be inserted when calling {@link save}.
-	 * This property is automatically set in constructor and {@link populateRecord}.
-	 * Defaults to false, but it will be set to true if the instance is created using
-	 * the new operator.
-	 * @since v1.0
-	 */
-	public function getIsNewRecord()
-	{
-		return $this->_new;
-	}
+    /**
+     * Returns if the current record is new.
+     * @return boolean whether the record is new and should be inserted when calling {@link save}.
+     * This property is automatically set in constructor and {@link populateRecord}.
+     * Defaults to false, but it will be set to true if the instance is created using
+     * the new operator.
+     * @since v1.0
+     */
+    public function getIsNewRecord()
+    {
+        return $this->_new;
+    }
 
-	/**
-	 * Sets if the record is new.
-	 * @param boolean $value whether the record is new and should be inserted when calling {@link save}.
-	 * @see getIsNewRecord
-	 * @since v1.0
-	 */
-	public function setIsNewRecord($value)
-	{
-		$this->_new=$value;
-	}
+    /**
+     * Sets if the record is new.
+     * @param boolean $value whether the record is new and should be inserted when calling {@link save}.
+     * @see getIsNewRecord
+     * @since v1.0
+     */
+    public function setIsNewRecord($value)
+    {
+        $this->_new=$value;
+    }
 
-	/**
-	 * Returns the mongo criteria associated with this model.
-	 * @param boolean $createIfNull whether to create a criteria instance if it does not exist. Defaults to true.
-	 * @return EMongoCriteria the query criteria that is associated with this model.
-	 * This criteria is mainly used by {@link scopes named scope} feature to accumulate
-	 * different criteria specifications.
-	 * @since v1.0
-	 */
-	public function getDbCriteria($createIfNull=true)
-	{
-		if($this->_criteria===null)
-			if(($c = $this->defaultScope()) !== array() || $createIfNull)
-				$this->_criteria = new EMongoCriteria($c);
-		return $this->_criteria;
-	}
+    /**
+     * Returns the mongo criteria associated with this model.
+     * @param boolean $createIfNull whether to create a criteria instance if it does not exist. Defaults to true.
+     * @return EMongoCriteria the query criteria that is associated with this model.
+     * This criteria is mainly used by {@link scopes named scope} feature to accumulate
+     * different criteria specifications.
+     * @since v1.0
+     */
+    public function getDbCriteria($createIfNull = true)
+    {
+        if ($this->_criteria === null) {
+            if (($c = $this->defaultScope()) !== array() || $createIfNull) {
+                $this->_criteria = new EMongoCriteria($c);
+            }
+        }
+        return $this->_criteria;
+    }
 
-	/**
-	 * Set girrent object, this will override proevious criteria
-	 *
-	 * @param EMongoCriteria $criteria
-	 * @since v1.0
-	 */
-	public function setDbCriteria($criteria)
-	{
-		if(is_array($criteria))
-			$this->_criteria = new EMongoCriteria($criteria);
-		else if($criteria instanceof EMongoCriteria)
-			$this->_criteria = $criteria;
-		else
-			$this->_criteria = new EMongoCriteria();
-	}
+    /**
+     * Set girrent object, this will override proevious criteria
+     *
+     * @param EMongoCriteria $criteria
+     * @since v1.0
+     */
+    public function setDbCriteria($criteria)
+    {
+        if (is_array($criteria)) {
+            $this->_criteria = new EMongoCriteria($criteria);
+        } elseif ($criteria instanceof EMongoCriteria) {
+            $this->_criteria = $criteria;
+        } else {
+            $this->_criteria = new EMongoCriteria();
+        }
+    }
 
     /**
      * Get journaling flag
@@ -376,35 +411,40 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
         $this->_writeConcern = $flag;
     }
 
-	/**
-	 * Get value of use cursor flag
-	 *
-	 * It will return the nearest not null value in order:
-	 * - Criteria level
-	 * - Object level
-	 * - Model level
-	 * - Glopal level (always set)
-	 * @return boolean
-	 */
-	public function getUseCursor($criteria = null)
-	{
-		if($criteria !== null && $criteria->getUseCursor() !== null)
-			return $criteria->getUseCursor();
-		if($this->useCursor !== null)
-			return $this->useCursor; // We have flag set, return it
-		if((isset(self::$_models[get_class($this)]) === true) && (self::$_models[get_class($this)]->useCursor !== null))
-			return self::$_models[get_class($this)]->useCursor; // Model have flag set, return it
-		return $this->getMongoDBComponent()->useCursor;
-	}
+    /**
+     * Get value of use cursor flag
+     *
+     * It will return the nearest not null value in order:
+     * - Criteria level
+     * - Object level
+     * - Model level
+     * - Glopal level (always set)
+     * @return boolean
+     */
+    public function getUseCursor($criteria = null)
+    {
+        if ($criteria !== null && $criteria->getUseCursor() !== null) {
+            return $criteria->getUseCursor();
+        }
+        if ($this->useCursor !== null) {
+            return $this->useCursor; // We have flag set, return it
+        }
+        if ((isset(self::$_models[get_class($this)]) === true)
+            && (self::$_models[get_class($this)]->useCursor !== null)
+        ) {
+            return self::$_models[get_class($this)]->useCursor; // Model have flag set, return it
+        }
+        return $this->getMongoDBComponent()->useCursor;
+    }
 
-	/**
-	 * Set object level value of use cursor flag
-	 * @param boolean $useCursor true|false value for use cursor flag
-	 */
-	public function setUseCursor($useCursor)
-	{
-		$this->useCursor = ($useCursor == true);
-	}
+    /**
+     * Set object level value of use cursor flag
+     * @param boolean $useCursor true|false value for use cursor flag
+     */
+    public function setUseCursor($useCursor)
+    {
+        $this->useCursor = ($useCursor == true);
+    }
 
     /**
      * Determine whether ensureIndexes() should be called on intialization
@@ -479,14 +519,16 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
                     ) {
                         // Ensure the embedded document is sufficiently setup
                         $this->__set(
-                            $fieldName, array(
+                            $fieldName,
+                            array(
                                 $className['classField']
                                     => $values[$fieldName][$className['classField']]
                             )
                         );
                     }
                     $this->$fieldName->setAttributes(
-                        $values[$fieldName], $safeOnly
+                        $values[$fieldName],
+                        $safeOnly
                     );
                     unset($values[$fieldName]);
                 }
@@ -513,7 +555,8 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
             $profile = $this->getEnableProfiler();
             if ($profile) {
                 $profile = EMongoCriteria::commandToString(
-                    'getIndexes', $this->getCollectionName()
+                    'getIndexes',
+                    $this->getCollectionName()
                 );
                 Yii::beginProfile($profile, 'system.db.EMongoDocument');
             }
@@ -581,28 +624,26 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
         foreach ($this->indexes() as $name => $index) {
             if (!in_array($name, $indexNames)) {
                 $indexParams = array_merge(
-                    array('background' => true, 'name' => $name), $index
+                    array('background' => true, 'name' => $name),
+                    $index
                 );
                 unset($indexParams['key']);
 
                 $profile = $this->getEnableProfiler();
                 if ($profile) {
                     $profile = EMongoCriteria::commandToString(
-                        'ensureIndex', $this->getCollectionName(), $index['key'],
+                        'ensureIndex',
+                        $this->getCollectionName(),
+                        $index['key'],
                         $indexParams
                     );
                     Yii::beginProfile($profile, 'system.db.EMongoDocument');
                 }
                 try {
-                    if (version_compare(MongoClient::VERSION, '1.5') >= 0) {
-                        $this->getCollection()->createIndex(
-                            $index['key'], $indexParams
-                        );
-                    } else {
-                        $this->getCollection()->ensureIndex(
-                            $index['key'], $indexParams
-                        );
-                    }
+                    $this->getCollection()->createIndex(
+                        $index['key'],
+                        $indexParams
+                    );
                 } catch (MongoCursorException $ex) {
                     Yii::log(
                         'Failed to ensureIndex(); retrying. ' . PHP_EOL
@@ -610,15 +651,10 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
                         CLogger::LEVEL_WARNING
                     );
 
-                    if (version_compare(MongoClient::VERSION, '1.5') >= 0) {
-                        $this->getCollection()->createIndex(
-                            $index['key'], $indexParams
-                        );
-                    } else {
-                        $this->getCollection()->ensureIndex(
-                            $index['key'], $indexParams
-                        );
-                    }
+                    $this->getCollection()->createIndex(
+                        $index['key'],
+                        $indexParams
+                    );
                 }
 
                 if ($profile) {
@@ -630,129 +666,127 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
         }
     }
 
-	/**
-	 * Returns the declaration of named scopes.
-	 * A named scope represents a query criteria that can be chained together with
-	 * other named scopes and applied to a query. This method should be overridden
-	 * by child classes to declare named scopes for the particular document classes.
-	 * For example, the following code declares two named scopes: 'recently' and
-	 * 'published'.
-	 * <pre>
-	 * return array(
-	 *     'published'=>array(
-	 *           'conditions'=>array(
-	 *                 'status'=>array('==', 1),
-	 *           ),
-	 *     ),
-	 *     'recently'=>array(
-	 *           'sort'=>array('create_time'=>EMongoCriteria::SORT_DESC),
-	 *           'limit'=>5,
-	 *     ),
-	 * );
-	 * </pre>
-	 * If the above scopes are declared in a 'Post' model, we can perform the following
-	 * queries:
-	 * <pre>
-	 * $posts=Post::model()->published()->findAll();
-	 * $posts=Post::model()->published()->recently()->findAll();
-	 * $posts=Post::model()->published()->published()->recently()->find();
-	 * </pre>
-	 *
-	 * @return array the scope definition. The array keys are scope names; the array
-	 * values are the corresponding scope definitions. Each scope definition is represented
-	 * as an array whose keys must be properties of {@link EMongoCriteria}.
-	 * @since v1.0
-	 */
-	public function scopes()
-	{
-		return array();
-	}
+    /**
+     * Returns the declaration of named scopes.
+     * A named scope represents a query criteria that can be chained together with
+     * other named scopes and applied to a query. This method should be overridden
+     * by child classes to declare named scopes for the particular document classes.
+     * For example, the following code declares two named scopes: 'recently' and
+     * 'published'.
+     * <pre>
+     * return array(
+     *     'published'=>array(
+     *           'conditions'=>array(
+     *                 'status'=>array('==', 1),
+     *           ),
+     *     ),
+     *     'recently'=>array(
+     *           'sort'=>array('create_time'=>EMongoCriteria::SORT_DESC),
+     *           'limit'=>5,
+     *     ),
+     * );
+     * </pre>
+     * If the above scopes are declared in a 'Post' model, we can perform the following
+     * queries:
+     * <pre>
+     * $posts=Post::model()->published()->findAll();
+     * $posts=Post::model()->published()->recently()->findAll();
+     * $posts=Post::model()->published()->published()->recently()->find();
+     * </pre>
+     *
+     * @return array the scope definition. The array keys are scope names; the array
+     * values are the corresponding scope definitions. Each scope definition is represented
+     * as an array whose keys must be properties of {@link EMongoCriteria}.
+     * @since v1.0
+     */
+    public function scopes()
+    {
+        return array();
+    }
 
-	/**
-	 * Returns the default named scope that should be implicitly applied to all queries for this model.
-	 * Note, default scope only applies to SELECT queries. It is ignored for INSERT, UPDATE and DELETE queries.
-	 * The default implementation simply returns an empty array. You may override this method
-	 * if the model needs to be queried with some default criteria (e.g. only active records should be returned).
-	 * @return array the mongo criteria. This will be used as the parameter to the constructor
-	 * of {@link EMongoCriteria}.
-	 * @since v1.2.2
-	 */
-	public function defaultScope()
-	{
-		return array();
-	}
+    /**
+     * Returns the default named scope that should be implicitly applied to all queries for this model.
+     * Note, default scope only applies to SELECT queries. It is ignored for INSERT, UPDATE and DELETE queries.
+     * The default implementation simply returns an empty array. You may override this method
+     * if the model needs to be queried with some default criteria (e.g. only active records should be returned).
+     * @return array the mongo criteria. This will be used as the parameter to the constructor
+     * of {@link EMongoCriteria}.
+     * @since v1.2.2
+     */
+    public function defaultScope()
+    {
+        return array();
+    }
 
-	/**
-	 * Resets all scopes and criterias applied including default scope.
-	 *
-	 * @return EMongoDocument
-	 * @since v1.0
-	 */
-	public function resetScope()
-	{
-		$this->_criteria = new EMongoCriteria();
-		return $this;
-	}
+    /**
+     * Resets all scopes and criterias applied including default scope.
+     *
+     * @return EMongoDocument
+     * @since v1.0
+     */
+    public function resetScope()
+    {
+        $this->_criteria = new EMongoCriteria();
+        return $this;
+    }
 
-	/**
-	 * Applies the query scopes to the given criteria.
-	 * This method merges {@link dbCriteria} with the given criteria parameter.
-	 * It then resets {@link dbCriteria} to be null.
-	 * @param EMongoCriteria|array $criteria the query criteria. This parameter may be modified by merging {@link dbCriteria}.
-	 * @since v1.2.2
-	 */
-	public function applyScopes(&$criteria)
-	{
-		if($criteria === null)
-		{
-			$criteria = new EMongoCriteria();
-		}
-		else if(is_array($criteria))
-		{
-			$criteria = new EMongoCriteria($criteria);
-		}
-		else if(!($criteria instanceof EMongoCriteria))
-			throw new EMongoException('Cannot apply scopes to criteria');
+    /**
+     * Applies the query scopes to the given criteria.
+     * This method merges {@link dbCriteria} with the given criteria parameter.
+     * It then resets {@link dbCriteria} to be null.
+     * @param EMongoCriteria|array $criteria the query criteria. This parameter
+     *                                       may be modified by merging {@link dbCriteria}.
+     * @since v1.2.2
+     */
+    public function applyScopes(&$criteria)
+    {
+        if ($criteria === null) {
+            $criteria = new EMongoCriteria();
+        } elseif (is_array($criteria)) {
+            $criteria = new EMongoCriteria($criteria);
+        } elseif (!($criteria instanceof EMongoCriteria)) {
+            throw new EMongoException('Cannot apply scopes to criteria');
+        }
 
-		if(($c=$this->getDbCriteria(false))!==null)
-		{
-			$c->mergeWith($criteria);
-			$criteria=$c;
-			$this->_criteria=null;
-		}
-	}
+        if (($c = $this->getDbCriteria(false)) !== null) {
+            $c->mergeWith($criteria);
+            $criteria=$c;
+            $this->_criteria=null;
+        }
+    }
 
-	/**
-	 * Saves the current record.
-	 *
-	 * The record is inserted as a row into the database table if its {@link isNewRecord}
-	 * property is true (usually the case when the record is created using the 'new'
-	 * operator). Otherwise, it will be used to update the corresponding row in the table
-	 * (usually the case if the record is obtained using one of those 'find' methods.)
-	 *
-	 * Validation will be performed before saving the record. If the validation fails,
-	 * the record will not be saved. You can call {@link getErrors()} to retrieve the
-	 * validation errors.
-	 *
-	 * If the record is saved via insertion, its {@link isNewRecord} property will be
-	 * set false, and its {@link scenario} property will be set to be 'update'.
-	 * And if its primary key is auto-incremental and is not set before insertion,
-	 * the primary key will be populated with the automatically generated key value.
-	 *
-	 * @param boolean $runValidation whether to perform validation before saving the record.
-	 * If the validation fails, the record will not be saved to database.
-	 * @param array $attributes list of attributes that need to be saved. Defaults to null,
-	 * meaning all attributes that are loaded from DB will be saved.
-	 * @return boolean whether the saving succeeds
-	 * @since v1.0
-	 */
-	public function save($runValidation=true,$attributes=null)
-	{
-		if(!$runValidation || $this->validate($attributes))
-			return $this->getIsNewRecord() ? $this->insert($attributes) : $this->update($attributes);
-		else
-			return false;
-	}
+    /**
+     * Saves the current record.
+     *
+     * The record is inserted as a row into the database table if its {@link isNewRecord}
+     * property is true (usually the case when the record is created using the 'new'
+     * operator). Otherwise, it will be used to update the corresponding row in the table
+     * (usually the case if the record is obtained using one of those 'find' methods.)
+     *
+     * Validation will be performed before saving the record. If the validation fails,
+     * the record will not be saved. You can call {@link getErrors()} to retrieve the
+     * validation errors.
+     *
+     * If the record is saved via insertion, its {@link isNewRecord} property will be
+     * set false, and its {@link scenario} property will be set to be 'update'.
+     * And if its primary key is auto-incremental and is not set before insertion,
+     * the primary key will be populated with the automatically generated key value.
+     *
+     * @param boolean $runValidation whether to perform validation before saving the record.
+     * If the validation fails, the record will not be saved to database.
+     * @param array $attributes list of attributes that need to be saved. Defaults to null,
+     * meaning all attributes that are loaded from DB will be saved.
+     * @return boolean whether the saving succeeds
+     * @since v1.0
+     */
+    public function save($runValidation = true, $attributes = null)
+    {
+        if (!$runValidation || $this->validate($attributes)) {
+            return $this->getIsNewRecord() ? $this->insert($attributes) : $this->update($attributes);
+        } else {
+            return false;
+        }
+    }
 
     /**
      * Inserts a row into the table based on this active record attributes.
@@ -813,14 +847,17 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
         $profile = $this->getEnableProfiler();
         if ($profile) {
             $profile = EMongoCriteria::commandToString(
-                'insert', $this->getCollectionName(), $rawData
+                'insert',
+                $this->getCollectionName(),
+                $rawData
             );
             Yii::beginProfile($profile, 'system.db.EMongoDocument');
         }
 
         try {
             $result = $this->getCollection()->insert(
-                $rawData, array(
+                $rawData,
+                array(
                     'j' => $this->getFsyncFlag(),
                     'w' => $this->getSafeFlag(),
                 )
@@ -836,7 +873,8 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
                 CLogger::LEVEL_WARNING
             );
             $result = $this->getCollection()->insert(
-                $rawData, array(
+                $rawData,
+                array(
                     'j' => $this->getFsyncFlag(),
                     'w' => $this->getSafeFlag(),
                 )
@@ -859,7 +897,9 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
         if ($rawData) {
             $message = Yii::t('yii', 'Failed to save document');
         } else {
-            $message = Yii::t('yii', 'Unable to save an empty document: {class}',
+            $message = Yii::t(
+                'yii',
+                'Unable to save an empty document: {class}',
                 array('{class}' => get_class($this))
             );
         }
@@ -894,7 +934,8 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
         if ($this->getIsNewRecord()) {
             throw new CDbException(
                 Yii::t(
-                    'yii', 'The EMongoDocument cannot be updated because it is new.'
+                    'yii',
+                    'The EMongoDocument cannot be updated because it is new.'
                 )
             );
         }
@@ -917,10 +958,13 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
                     // Get the value for the inner attribute specified
                     foreach (explode('.', $attrib) as $key) {
                         if (!is_array($values) || !array_key_exists($key, $values)) {
-                            $message = Yii::t('yii',
-                                'Attribute {attr} does not exist on {doc}', array(
+                            $message = Yii::t(
+                                'yii',
+                                'Attribute {attr} does not exist on {doc}',
+                                array(
                                     '{attr}' => $attrib, '{doc}' => get_class($this)
-                                ));
+                                )
+                            );
                             throw new EMongoException($message);
                         }
                         $values = $values[$key];
@@ -942,8 +986,11 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
             }
             if ($profile) {
                 $profile = EMongoCriteria::commandToString(
-                    'update', $this->getCollectionName(),
-                    array('_id' => $this->_id), array('$set' => $rawData));
+                    'update',
+                    $this->getCollectionName(),
+                    array('_id' => $this->_id),
+                    array('$set' => $rawData)
+                );
                 Yii::beginProfile($profile, 'system.db.EMongoDocument');
             }
 
@@ -983,7 +1030,9 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
         } else {
             if ($profile) {
                 $profile = EMongoCriteria::commandToString(
-                    'save', $this->getCollectionName(), $rawData
+                    'save',
+                    $this->getCollectionName(),
+                    $rawData
                 );
                 Yii::beginProfile($profile, 'system.db.EMongoDocument');
             }
@@ -1031,7 +1080,9 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
         if ($rawData) {
             $message = Yii::t('yii', 'Failed to save document');
         } else {
-            $message = Yii::t('yii', 'Unable to save an empty document: {class}',
+            $message = Yii::t(
+                'yii',
+                'Unable to save an empty document: {class}',
                 array('{class}' => get_class($this))
             );
         }
@@ -1059,8 +1110,11 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
         $profile = $this->getEnableProfiler();
         if ($profile) {
             $profile = EMongoCriteria::commandToString(
-                'update', $this->getCollectionName(), $criteria->getConditions(),
-                $modifier->getModifiers(), array('multiple' => true)
+                'update',
+                $this->getCollectionName(),
+                $criteria->getConditions(),
+                $modifier->getModifiers(),
+                array('multiple' => true)
             );
             Yii::beginProfile($profile, 'system.db.EMongoDocument');
         }
@@ -1082,7 +1136,8 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
                 CLogger::LEVEL_WARNING
             );
             $result = $this->getCollection()->update(
-                $criteria->getConditions(), $modifier->getModifiers(),
+                $criteria->getConditions(),
+                $modifier->getModifiers(),
                 array(
                     'j'        => $this->getFsyncFlag(),
                     'w'        => $this->getSafeFlag(),
@@ -1107,7 +1162,8 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
         if ($this->getIsNewRecord()) {
             throw new CDbException(
                 Yii::t(
-                    'yii', 'The EMongoDocument cannot be deleted because it is new.'
+                    'yii',
+                    'The EMongoDocument cannot be deleted because it is new.'
                 )
             );
         }
@@ -1148,7 +1204,9 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
         $profile = $this->getEnableProfiler();
         if ($profile) {
             $profile = EMongoCriteria::commandToString(
-                'remove', $this->getCollectionName(), $criteria->getConditions(),
+                'remove',
+                $this->getCollectionName(),
+                $criteria->getConditions(),
                 true // justOne
             );
             Yii::beginProfile($profile, 'system.db.EMongoDocument');
@@ -1258,11 +1316,13 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
      * If an array, it is treated as the initial values for constructing a
      * {@link EMongoCriteria} object; Otherwise, it should be an instance of
      * {@link EMongoCriteria}.
+     * @param array $options Array of options passed to findOne: maxTimeMS
      *
+     * @see MongoCollection::findOne Find operation
      * @return EMongoDocument|null the record found. Null if no record is found.
      * @since v1.0
      */
-    public function find($criteria = null)
+    public function find($criteria = null, $options = array())
     {
         Yii::trace(get_class($this) . '.find()', 'MongoDb.EMongoDocument');
 
@@ -1275,13 +1335,17 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
         $profile = $this->getEnableProfiler();
         if ($profile) {
             $profile = EMongoCriteria::findToString(
-                $criteria, false, $this->getCollectionName()
+                $criteria,
+                false,
+                $this->getCollectionName()
             );
             Yii::beginProfile($profile, 'system.db.EMongoDocument');
         }
         try {
             $doc = $this->getCollection()->findOne(
-                $criteria->getConditions(), $criteria->getSelect()
+                $criteria->getConditions(),
+                $criteria->getSelect(),
+                $options
             );
         } catch (MongoException $ex) {
             Yii::log(
@@ -1290,7 +1354,8 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
                 CLogger::LEVEL_WARNING
             );
             $doc = $this->getCollection()->findOne(
-                $criteria->getConditions(), $criteria->getSelect()
+                $criteria->getConditions(),
+                $criteria->getSelect()
             );
         }
 
@@ -1324,7 +1389,9 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
         $profile = $this->getEnableProfiler();
         if ($profile) {
             $profile = EMongoCriteria::findToString(
-                $criteria, true, $this->getCollectionName()
+                $criteria,
+                true,
+                $this->getCollectionName()
             );
             Yii::beginProfile($profile, 'system.db.EMongoDocument');
         }
@@ -1498,7 +1565,9 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
         $profile = $this->getEnableProfiler();
         if ($profile) {
             $profile = EMongoCriteria::commandToString(
-                'count', $this->getCollectionName(), $criteria->getConditions()
+                'count',
+                $this->getCollectionName(),
+                $criteria->getConditions()
             );
             Yii::beginProfile($profile, 'system.db.EMongoDocument');
         }
@@ -1532,7 +1601,8 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
     public function countByAttributes(array $attributes)
     {
         Yii::trace(
-            get_class($this) . '.countByAttributes()', 'MongoDb.EMongoDocument'
+            get_class($this) . '.countByAttributes()',
+            'MongoDb.EMongoDocument'
         );
 
         $criteria = new EMongoCriteria;
@@ -1545,7 +1615,9 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
         $profile = $this->getEnableProfiler();
         if ($profile) {
             $profile = EMongoCriteria::commandToString(
-                'count', $this->getCollectionName(), $criteria->getConditions()
+                'count',
+                $this->getCollectionName(),
+                $criteria->getConditions()
             );
             Yii::beginProfile($profile, 'system.db.EMongoDocument');
         }
@@ -1586,7 +1658,9 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
         $profile = $this->getEnableProfiler();
         if ($profile) {
             $profile = EMongoCriteria::commandToString(
-                'remove', $this->getCollectionName(), $criteria->getConditions(),
+                'remove',
+                $this->getCollectionName(),
+                $criteria->getConditions(),
                 false // justOne
             );
             Yii::beginProfile($profile, 'system.db.EMongoDocument');
@@ -1594,7 +1668,8 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
 
         try {
             $result = $this->getCollection()->remove(
-                $criteria->getConditions(), array(
+                $criteria->getConditions(),
+                array(
                     'justOne' => false,
                     'j'       => $this->getFsyncFlag(),
                     'w'       => $this->getSafeFlag(),
@@ -1607,7 +1682,8 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
                 CLogger::LEVEL_WARNING
             );
             $result = $this->getCollection()->remove(
-                $criteria->getConditions(), array(
+                $criteria->getConditions(),
+                array(
                     'justOne' => false,
                     'j'       => $this->getFsyncFlag(),
                     'w'       => $this->getSafeFlag(),
@@ -1622,227 +1698,227 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
         return $result;
     }
 
-	/**
-	 * This event is raised before the record is saved.
-	 * By setting {@link CModelEvent::isValid} to be false, the normal {@link save()} process will be stopped.
-	 * @param CModelEvent $event the event parameter
-	 * @since v1.0
-	 */
-	public function onBeforeSave($event)
-	{
-		$this->raiseEvent('onBeforeSave',$event);
-	}
+    /**
+     * This event is raised before the record is saved.
+     * By setting {@link CModelEvent::isValid} to be false, the normal {@link save()} process will be stopped.
+     * @param CModelEvent $event the event parameter
+     * @since v1.0
+     */
+    public function onBeforeSave($event)
+    {
+        $this->raiseEvent('onBeforeSave', $event);
+    }
 
-	/**
-	 * This event is raised after the record is saved.
-	 * @param CEvent $event the event parameter
-	 * @since v1.0
-	 */
-	public function onAfterSave($event)
-	{
-		$this->raiseEvent('onAfterSave',$event);
-	}
+    /**
+     * This event is raised after the record is saved.
+     * @param CEvent $event the event parameter
+     * @since v1.0
+     */
+    public function onAfterSave($event)
+    {
+        $this->raiseEvent('onAfterSave', $event);
+    }
 
-	/**
-	 * This event is raised before the record is deleted.
-	 * By setting {@link CModelEvent::isValid} to be false, the normal {@link delete()} process will be stopped.
-	 * @param CModelEvent $event the event parameter
-	 * @since v1.0
-	 */
-	public function onBeforeDelete($event)
-	{
-		$this->raiseEvent('onBeforeDelete',$event);
-	}
+    /**
+     * This event is raised before the record is deleted.
+     * By setting {@link CModelEvent::isValid} to be false, the normal {@link delete()} process will be stopped.
+     * @param CModelEvent $event the event parameter
+     * @since v1.0
+     */
+    public function onBeforeDelete($event)
+    {
+        $this->raiseEvent('onBeforeDelete', $event);
+    }
 
-	/**
-	 * This event is raised after the record is deleted.
-	 * @param CEvent $event the event parameter
-	 * @since v1.0
-	 */
-	public function onAfterDelete($event)
-	{
-		$this->raiseEvent('onAfterDelete',$event);
-	}
+    /**
+     * This event is raised after the record is deleted.
+     * @param CEvent $event the event parameter
+     * @since v1.0
+     */
+    public function onAfterDelete($event)
+    {
+        $this->raiseEvent('onAfterDelete', $event);
+    }
 
-	/**
-	 * This event is raised before finder performs a find call.
-	 * In this event, the {@link CModelEvent::criteria} property contains the query criteria
-	 * passed as parameters to those find methods. If you want to access
-	 * the query criteria specified in scopes, please use {@link getDbCriteria()}.
-	 * You can modify either criteria to customize them based on needs.
-	 * @param CModelEvent $event the event parameter
-	 * @see beforeFind
-	 * @since v1.0
-	 */
-	public function onBeforeFind($event)
-	{
-		$this->raiseEvent('onBeforeFind',$event);
-	}
+    /**
+     * This event is raised before finder performs a find call.
+     * In this event, the {@link CModelEvent::criteria} property contains the query criteria
+     * passed as parameters to those find methods. If you want to access
+     * the query criteria specified in scopes, please use {@link getDbCriteria()}.
+     * You can modify either criteria to customize them based on needs.
+     * @param CModelEvent $event the event parameter
+     * @see beforeFind
+     * @since v1.0
+     */
+    public function onBeforeFind($event)
+    {
+        $this->raiseEvent('onBeforeFind', $event);
+    }
 
-	/**
-	 * This event is raised after the record is instantiated by a find method.
-	 * @param CEvent $event the event parameter
-	 * @since v1.0
-	 */
-	public function onAfterFind($event)
-	{
-		$this->raiseEvent('onAfterFind',$event);
-	}
+    /**
+     * This event is raised after the record is instantiated by a find method.
+     * @param CEvent $event the event parameter
+     * @since v1.0
+     */
+    public function onAfterFind($event)
+    {
+        $this->raiseEvent('onAfterFind', $event);
+    }
 
-	/**
-	 * This method is invoked before saving a record (after validation, if any).
-	 * The default implementation raises the {@link onBeforeSave} event.
-	 * You may override this method to do any preparation work for record saving.
-	 * Use {@link isNewRecord} to determine whether the saving is
-	 * for inserting or updating record.
-	 * Make sure you call the parent implementation so that the event is raised properly.
-	 * @return boolean whether the saving should be executed. Defaults to true.
-	 * @since v1.0
-	 */
-	protected function beforeSave()
-	{
-		if($this->hasEventHandler('onBeforeSave'))
-		{
-			$event=new CModelEvent($this);
-			$this->onBeforeSave($event);
-			return $event->isValid;
-		}
-		else
-			return true;
-	}
+    /**
+     * This method is invoked before saving a record (after validation, if any).
+     * The default implementation raises the {@link onBeforeSave} event.
+     * You may override this method to do any preparation work for record saving.
+     * Use {@link isNewRecord} to determine whether the saving is
+     * for inserting or updating record.
+     * Make sure you call the parent implementation so that the event is raised properly.
+     * @return boolean whether the saving should be executed. Defaults to true.
+     * @since v1.0
+     */
+    protected function beforeSave()
+    {
+        if ($this->hasEventHandler('onBeforeSave')) {
+            $event = new CModelEvent($this);
+            $this->onBeforeSave($event);
+            return $event->isValid;
+        } else {
+            return true;
+        }
+    }
 
-	/**
-	 * This method is invoked after saving a record successfully.
-	 * The default implementation raises the {@link onAfterSave} event.
-	 * You may override this method to do postprocessing after record saving.
-	 * Make sure you call the parent implementation so that the event is raised properly.
-	 * @since v1.0
-	 */
-	protected function afterSave()
-	{
-		if($this->hasEventHandler('onAfterSave'))
-			$this->onAfterSave(new CEvent($this));
-	}
+    /**
+     * This method is invoked after saving a record successfully.
+     * The default implementation raises the {@link onAfterSave} event.
+     * You may override this method to do postprocessing after record saving.
+     * Make sure you call the parent implementation so that the event is raised properly.
+     * @since v1.0
+     */
+    protected function afterSave()
+    {
+        if ($this->hasEventHandler('onAfterSave')) {
+            $this->onAfterSave(new CEvent($this));
+        }
+    }
 
-	/**
-	 * This method is invoked before deleting a record.
-	 * The default implementation raises the {@link onBeforeDelete} event.
-	 * You may override this method to do any preparation work for record deletion.
-	 * Make sure you call the parent implementation so that the event is raised properly.
-	 * @return boolean whether the record should be deleted. Defaults to true.
-	 * @since v1.0
-	 */
-	protected function beforeDelete()
-	{
-		if($this->hasEventHandler('onBeforeDelete'))
-		{
-			$event=new CModelEvent($this);
-			$this->onBeforeDelete($event);
-			return $event->isValid;
-		}
-		else
-			return true;
-	}
+    /**
+     * This method is invoked before deleting a record.
+     * The default implementation raises the {@link onBeforeDelete} event.
+     * You may override this method to do any preparation work for record deletion.
+     * Make sure you call the parent implementation so that the event is raised properly.
+     * @return boolean whether the record should be deleted. Defaults to true.
+     * @since v1.0
+     */
+    protected function beforeDelete()
+    {
+        if ($this->hasEventHandler('onBeforeDelete')) {
+            $event = new CModelEvent($this);
+            $this->onBeforeDelete($event);
+            return $event->isValid;
+        } else {
+            return true;
+        }
+    }
 
-	/**
-	 * This method is invoked after deleting a record.
-	 * The default implementation raises the {@link onAfterDelete} event.
-	 * You may override this method to do postprocessing after the record is deleted.
-	 * Make sure you call the parent implementation so that the event is raised properly.
-	 * @since v1.0
-	 */
-	protected function afterDelete()
-	{
-		if($this->hasEventHandler('onAfterDelete'))
-			$this->onAfterDelete(new CEvent($this));
-	}
+    /**
+     * This method is invoked after deleting a record.
+     * The default implementation raises the {@link onAfterDelete} event.
+     * You may override this method to do postprocessing after the record is deleted.
+     * Make sure you call the parent implementation so that the event is raised properly.
+     * @since v1.0
+     */
+    protected function afterDelete()
+    {
+        if ($this->hasEventHandler('onAfterDelete')) {
+            $this->onAfterDelete(new CEvent($this));
+        }
+    }
 
-	/**
-	 * This method is invoked before an AR finder executes a find call.
-	 * The find calls include {@link find}, {@link findAll}, {@link findByPk},
-	 * {@link findAllByPk}, {@link findByAttributes} and {@link findAllByAttributes}.
-	 * The default implementation raises the {@link onBeforeFind} event.
-	 * If you override this method, make sure you call the parent implementation
-	 * so that the event is raised properly.
-	 *
-	 * Starting from version 1.1.5, this method may be called with a hidden {@link CDbCriteria}
-	 * parameter which represents the current query criteria as passed to a find method of AR.
-	 * @since v1.0
-	 */
-	protected function beforeFind()
-	{
-		if($this->hasEventHandler('onBeforeFind'))
-		{
-			$event=new CModelEvent($this);
-			$this->onBeforeFind($event);
-			return $event->isValid;
-		}
-		else
-			return true;
-	}
+    /**
+     * This method is invoked before an AR finder executes a find call.
+     * The find calls include {@link find}, {@link findAll}, {@link findByPk},
+     * {@link findAllByPk}, {@link findByAttributes} and {@link findAllByAttributes}.
+     * The default implementation raises the {@link onBeforeFind} event.
+     * If you override this method, make sure you call the parent implementation
+     * so that the event is raised properly.
+     *
+     * Starting from version 1.1.5, this method may be called with a hidden {@link CDbCriteria}
+     * parameter which represents the current query criteria as passed to a find method of AR.
+     * @since v1.0
+     */
+    protected function beforeFind()
+    {
+        if ($this->hasEventHandler('onBeforeFind')) {
+            $event = new CModelEvent($this);
+            $this->onBeforeFind($event);
+            return $event->isValid;
+        } else {
+            return true;
+        }
+    }
 
-	/**
-	 * This method is invoked after each record is instantiated by a find method.
-	 * The default implementation raises the {@link onAfterFind} event.
-	 * You may override this method to do postprocessing after each newly found record is instantiated.
-	 * Make sure you call the parent implementation so that the event is raised properly.
-	 * @since v1.0
-	 */
-	protected function afterFind()
-	{
-		if($this->hasEventHandler('onAfterFind'))
-			$this->onAfterFind(new CEvent($this));
-	}
+    /**
+     * This method is invoked after each record is instantiated by a find method.
+     * The default implementation raises the {@link onAfterFind} event.
+     * You may override this method to do postprocessing after each newly found record is instantiated.
+     * Make sure you call the parent implementation so that the event is raised properly.
+     * @since v1.0
+     */
+    protected function afterFind()
+    {
+        if ($this->hasEventHandler('onAfterFind')) {
+            $this->onAfterFind(new CEvent($this));
+        }
+    }
 
-	/**
-	 * Creates an document instance.
-	 * This method is called by {@link populateRecord} and {@link populateRecords}.
-	 * You may override this method if the instance being created
-	 * depends the attributes that are to be populated to the record.
-	 * @param array $attributes list of attribute values for the active records.
-	 * @return EMongoDocument the document
-	 * @since v1.0
-	 */
-	protected function instantiate($attributes)
-	{
-		$class=get_class($this);
-		$model=new $class(null);
-		$model->initEmbeddedDocuments();
-		$model->setAttributes($attributes, false);
-		return $model;
-	}
+    /**
+     * Creates an document instance.
+     * This method is called by {@link populateRecord} and {@link populateRecords}.
+     * You may override this method if the instance being created
+     * depends the attributes that are to be populated to the record.
+     * @param array $attributes list of attribute values for the active records.
+     * @return EMongoDocument the document
+     * @since v1.0
+     */
+    protected function instantiate($attributes)
+    {
+        $class=get_class($this);
+        $model = new $class(null);
+        $model->initEmbeddedDocuments();
+        $model->setAttributes($attributes, false);
+        return $model;
+    }
 
-	/**
-	 * Creates an EMongoDocument with the given attributes.
-	 * This method is internally used by the find methods.
-	 * @param array $attributes attribute values (column name=>column value)
-	 * @param boolean $callAfterFind whether to call {@link afterFind} after the record is populated.
-	 * This parameter is added in version 1.0.3.
-	 * @return EMongoDocument the newly created document. The class of the object is the same as the model class.
-	 * Null is returned if the input data is false.
-	 * @since v1.0
-	 */
-	public function populateRecord($document, $callAfterFind=true)
-	{
-		if($document!==null)
-		{
-			$model=$this->instantiate($document);
-			$model->setScenario('update');
-			$model->init();
+    /**
+     * Creates an EMongoDocument with the given attributes.
+     * This method is internally used by the find methods.
+     * @param array $attributes attribute values (column name=>column value)
+     * @param boolean $callAfterFind whether to call {@link afterFind} after the record is populated.
+     * This parameter is added in version 1.0.3.
+     * @return EMongoDocument the newly created document. The class of the object is the same as the model class.
+     * Null is returned if the input data is false.
+     * @since v1.0
+     */
+    public function populateRecord($document, $callAfterFind = true)
+    {
+        if ($document!==null) {
+            $model = $this->instantiate($document);
+            $model->setScenario('update');
+            $model->init();
 
             // Behaviors have already been attached in the constructor so we need to
             // prevent duplicates but allow for behaviors that are conditionally
             // attached based on populated values
             $model->detachBehaviors();
-			$model->attachBehaviors($model->behaviors());
+            $model->attachBehaviors($model->behaviors());
 
-			if($callAfterFind)
-				$model->afterFind();
-			return $model;
-		}
-		else
-			return null;
-	}
+            if ($callAfterFind) {
+                $model->afterFind();
+            }
+            return $model;
+        } else {
+            return null;
+        }
+    }
 
     /**
      * Creates a list of documents based on the input data.
@@ -1985,7 +2061,8 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
             } else {
                 throw new EMongoException(
                     Yii::t(
-                        'yii', 'Cannot create PK criteria for multiple composite '
+                        'yii',
+                        'Cannot create PK criteria for multiple composite '
                         . 'key\'s (not implemented yet)'
                     )
                 );
@@ -2034,13 +2111,12 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
      */
     public function uniqueValidator($attribute, $params)
     {
-        // Ensure reference can be resolved
-        if (! Yii::getPathOfAlias('MongoDb')) {
-            Yii::setPathOfAlias('MongoDb', __DIR__);
-        }
         // Proxy to EMongoUniqueValidator
         $validator = CValidator::createValidator(
-            'MongoDb.extra.EMongoUniqueValidator', $this, $attribute, $params
+            'MongoDb\\extra\\EMongoUniqueValidator',
+            $this,
+            $attribute,
+            $params
         );
         $validator->validate($this, array($attribute));
     }

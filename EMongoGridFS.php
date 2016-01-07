@@ -2,63 +2,75 @@
 /**
  * EMongoGridFS.php
  *
- * PHP version 5.2+
+ * PHP version 5.3+
  *
- * @author		Jose Martinez <jmartinez@ibitux.com>
- * @author		Philippe Gaultier <pgaultier@ibitux.com>
- * @author		Dariusz Górecki <darek.krk@gmail.com>
- * @author		Invenzzia Group, open-source division of CleverIT company http://www.invenzzia.org
- * @copyright	2011 Ibitux
- * @license		http://www.yiiframework.com/license/ BSD license
- * @version		SVN: $Revision: $
- * @category	ext
- * @package		ext.YiiMongoDbSuite
- * @since		v1.3
+ * @author      Jose Martinez <jmartinez@ibitux.com>
+ * @author      Philippe Gaultier <pgaultier@ibitux.com>
+ * @author      Dariusz Górecki <darek.krk@gmail.com>
+ * @author      Invenzzia Group, open-source division of CleverIT company http://www.invenzzia.org
+ * @copyright   2011 Ibitux
+ * @license     http://www.yiiframework.com/license/ BSD license
+ * @version     SVN: $Revision: $
+ * @category    ext
+ * @package     ext.YiiMongoDbSuite
+ * @since       v1.3
  */
+
+namespace YiiMongoDbSuite;
+
+use \CDbException;
+use \CException;
+use \CLogger;
+use \MongoId;
+use \MongoException;
+use \MongoGridFSFile;
+use \Yii;
 
 /**
  * EMongoGridFS
  *
- * @author		Jose Martinez <jmartinez@ibitux.com>
- * @author		Philippe Gaultier <pgaultier@ibitux.com>
- * @author		Dariusz Górecki <darek.krk@gmail.com>
- * @author		Invenzzia Group, open-source division of CleverIT company http://www.invenzzia.org
- * @copyright	2011 Ibitux
- * @license		http://www.yiiframework.com/license/ BSD license
- * @version		SVN: $Revision: $
- * @category	ext
- * @package		ext.YiiMongoDbSuite
- * @since		v1.3
+ * @author      Jose Martinez <jmartinez@ibitux.com>
+ * @author      Philippe Gaultier <pgaultier@ibitux.com>
+ * @author      Dariusz Górecki <darek.krk@gmail.com>
+ * @author      Invenzzia Group, open-source division of CleverIT company http://www.invenzzia.org
+ * @copyright   2011 Ibitux
+ * @license     http://www.yiiframework.com/license/ BSD license
+ * @version     SVN: $Revision: $
+ * @category    ext
+ * @package     ext.YiiMongoDbSuite
+ * @since       v1.3
  *
  */
 abstract class EMongoGridFS extends EMongoDocument
 {
-	/**
-	 * MongoGridFSFile will be stored here
-	 * @var MongoGridFSFile
-	 */
-	private $_gridFSFile;
+    /**
+     * MongoGridFSFile will be stored here
+     * @var MongoGridFSFile
+     */
+    private $_gridFSFile;
 
-	/**
-	 * Every EMongoGridFS object has to have one
-	 * @var String $filename
-	 * @since v1.3
-	 */
-	public $filename = null; // mandatory
+    /**
+     * Every EMongoGridFS object has to have one
+     * @var String $filename
+     * @since v1.3
+     */
+    public $filename = null; // mandatory
 
-	/**
-	 * Returns current MongoGridFS object
-	 * By default this method use {@see getCollectionName()}
-	 * @return MongoGridFS
-	 * @since v1.3
-	 */
-	public function getCollection()
-	{
-		if(!isset(self::$_collections[$this->getCollectionName()]))
-			self::$_collections[$this->getCollectionName()] = $this->getDb()->getGridFS($this->getCollectionName());
+    /**
+     * Returns current MongoGridFS object
+     * By default this method use {@see getCollectionName()}
+     * @return MongoGridFS
+     * @since v1.3
+     */
+    public function getCollection()
+    {
+        if (!isset(self::$_collections[$this->getCollectionName()])) {
+            self::$_collections[$this->getCollectionName()]
+                = $this->getDb()->getGridFS($this->getCollectionName());
+        }
 
-		return self::$_collections[$this->getCollectionName()];
-	}
+        return self::$_collections[$this->getCollectionName()];
+    }
 
     /**
      * Inserts a row into the table based on this active record attributes.
@@ -83,7 +95,8 @@ abstract class EMongoGridFS extends EMongoDocument
         if (!$this->getIsNewRecord()) {
             throw new CDbException(
                 Yii::t(
-                    'yii', 'The EMongoDocument cannot be inserted to '
+                    'yii',
+                    'The EMongoDocument cannot be inserted to '
                     . 'database because it is not new.'
                 )
             );
@@ -117,7 +130,8 @@ abstract class EMongoGridFS extends EMongoDocument
         if (!($pk instanceof MongoId)) {
             throw new CDbException(
                 Yii::t(
-                    'yii', 'The EMongoDocument cannot be inserted to database '
+                    'yii',
+                    'The EMongoDocument cannot be inserted to database '
                     . 'primary key is not defined.'
                 )
             );
@@ -167,7 +181,10 @@ abstract class EMongoGridFS extends EMongoDocument
         $profile = $this->getEnableProfiler();
         if ($profile) {
             $profile = EMongoCriteria::commandToString(
-                'write', $this->getCollectionName(), $filename, $rawData
+                'write',
+                $this->getCollectionName(),
+                $filename,
+                $rawData
             );
             Yii::beginProfile($profile, 'system.db.EMongoGridFS');
         }
@@ -200,7 +217,9 @@ abstract class EMongoGridFS extends EMongoDocument
                     array('conditions' => array('_id' => $this->_id))
                 );
                 $profile = EMongoCriteria::findToString(
-                    $criteria, false, $this->getCollectionName()
+                    $criteria,
+                    false,
+                    $this->getCollectionName()
                 );
                 Yii::beginProfile($profile, 'system.db.EMongoGridFS');
             }
@@ -254,7 +273,8 @@ abstract class EMongoGridFS extends EMongoDocument
         if ($this->getIsNewRecord()) {
             throw new CDbException(
                 Yii::t(
-                    'yii','The EMongoDocument cannot be updated because it is new.'
+                    'yii',
+                    'The EMongoDocument cannot be updated because it is new.'
                 )
             );
         }
