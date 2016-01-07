@@ -9,6 +9,7 @@ use \MongoClient;
 use \MongoDate;
 use \MongoId;
 use \MongoRegex;
+use \Yii;
 
 /**
  * EMongoValidator verifies if the attribute is of the type specified by {@link type}.

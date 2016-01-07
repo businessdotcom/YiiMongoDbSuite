@@ -21,6 +21,7 @@ use \CDbException;
 use \CEvent;
 use \CLogger;
 use \CModelEvent;
+use \CValidator;
 use \MongoCollection;
 use \MongoCursorException;
 use \MongoException;
@@ -2113,7 +2114,7 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
     {
         // Proxy to EMongoUniqueValidator
         $validator = CValidator::createValidator(
-            'MongoDb\\extra\\EMongoUniqueValidator',
+            'YiiMongoDbSuite\\extra\\EMongoUniqueValidator',
             $this,
             $attribute,
             $params

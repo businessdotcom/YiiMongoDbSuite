@@ -16,7 +16,9 @@
 
 namespace YiiMongoDbSuite\extra;
 
+use \CException;
 use \YiiMongoDbSuite\EMongoDocument;
+use \Yii;
 
 /**
  * @since v1.0
