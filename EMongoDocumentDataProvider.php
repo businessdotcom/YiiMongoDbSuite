@@ -17,6 +17,7 @@
 namespace YiiMongoDbSuite;
 
 use \CException;
+use \CHtml;
 
 /**
  * EMongoRecordDataProvider implements a data provider based on EMongoRecord.
@@ -77,7 +78,7 @@ class EMongoDocumentDataProvider extends \CDataProvider
             unset($config['criteria']);
         }
 
-        $this->setId($this->modelClass);
+        $this->setId(CHtml::modelName($this->model));
         foreach ($config as $key => $value) {
             $this->$key = $value;
         }
