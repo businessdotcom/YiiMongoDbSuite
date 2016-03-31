@@ -17,7 +17,6 @@
 namespace YiiMongoDbSuite\extra;
 
 use \CException;
-use \YiiMongoDbSuite\EMongoDocument;
 use \Yii;
 
 /**
@@ -62,28 +61,19 @@ class EEmbeddedArraysBehavior extends \YiiMongoDbSuite\EMongoDocumentBehavior
     private $_cache;
 
     /**
-     * This flag shows us if we're connected to an embedded document
-     *
-     * @var boolean $_embeddedOwner
+     * Events that EEmbeddedArraysBehavior implement.
+     * @return array events (array keys) and the corresponding event handler methods (array values).
+     * @see \CBehavior::events
      */
-    private $_embeddedOwner;
-
     public function events()
     {
-        if (!$this->_embeddedOwner) {
-            return parent::events();
-        } else {
-            // If attached to an embedded document these events are not defined
-            // and would throw an error if attached to
-            $events = parent::events();
-            unset($events['onBeforeSave']);
-            unset($events['onAfterSave']);
-            unset($events['onBeforeDelete']);
-            unset($events['onAfterDelete']);
-            unset($events['onBeforeFind']);
-            unset($events['onAfterFind']);
-            return $events;
-        }
+        return array(
+            'onAfterEmbeddedDocsInit' => 'afterEmbeddedDocsInit',
+            'onBeforeToArray'         => 'beforeToArray',
+            'onAfterToArray'          => 'afterToArray',
+            'onBeforeValidate'        => 'beforeValidate',
+            'onAfterValidate'         => 'afterValidate',
+        );
     }
 
     /**
@@ -92,8 +82,6 @@ class EEmbeddedArraysBehavior extends \YiiMongoDbSuite\EMongoDocumentBehavior
      */
     public function attach($owner)
     {
-        $this->_embeddedOwner = !($owner instanceof EMongoDocument);
-
         parent::attach($owner);
 
         $this->parseExistingArray();
@@ -113,9 +101,10 @@ class EEmbeddedArraysBehavior extends \YiiMongoDbSuite\EMongoDocumentBehavior
      */
     protected function parseExistingArray()
     {
-        if (is_array($this->getOwner()->{$this->arrayPropertyName})) {
+        $values = $this->getOwner()->{$this->arrayPropertyName};
+        if ($values && is_array($values)) {
             $arrayOfDocs = array();
-            foreach ($this->getOwner()->{$this->arrayPropertyName} as $doc) {
+            foreach ($values as $doc) {
                 // Build the class name if dynamic
                 if ($this->classField && isset($doc[$this->classField])) {
                     $class = $this->classPrefix . $doc[$this->classField];
@@ -182,8 +171,9 @@ class EEmbeddedArraysBehavior extends \YiiMongoDbSuite\EMongoDocumentBehavior
     public function afterValidate($event)
     {
         parent::afterValidate($event);
-        if (is_array($this->getOwner()->{$this->arrayPropertyName})) {
-            foreach ($this->getOwner()->{$this->arrayPropertyName} as $doc) {
+        $values = $this->getOwner()->{$this->arrayPropertyName};
+        if ($values && is_array($values)) {
+            foreach ($values as $doc) {
                 if (!$doc->validate(null, false)) {
                     $this->getOwner()->addErrors($doc->getErrors());
                 }
