@@ -666,7 +666,7 @@ class EMongoCriteria extends \CComponent
                             . base64_decode($value->bin) . '")';
                 }
             } else {
-                $string = CJSON::encode($value);
+                $string = json_encode($value, JSON_UNESCAPED_SLASHES);
             }
         } else {
             $string = '';
@@ -680,7 +680,7 @@ class EMongoCriteria extends \CComponent
             foreach ($value as $key => $innerValue) {
                 // Check if an associative array or not
                 if (!is_int($key)) {
-                    $string .= CJSON::encode($key) . ' : ';
+                    $string .= json_encode($key, JSON_UNESCAPED_SLASHES) . ' : ';
                 }
                 $string .= self::queryValueToString($innerValue) . ', ';
             }
