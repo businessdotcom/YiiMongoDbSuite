@@ -348,8 +348,9 @@ abstract class EMongoEmbeddedDocument extends \CModel
                 }
             }
             if ($this->hasEmbeddedDocuments()) {
+                // Ensure embedded config is defined if called on ::model() instance
                 if (! isset(self::$_embeddedConfig[$className])) {
-                    self::$_embeddedConfig[get_class($this)] = $this->embeddedDocuments();
+                    $this->initEmbeddedDocuments();
                 }
 
                 $names = array_merge(
